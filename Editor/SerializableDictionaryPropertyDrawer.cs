@@ -288,6 +288,12 @@ public class SerializableDictionaryPropertyDrawer : PropertyDrawer
 		float valuePropertyHeight = EditorGUI.GetPropertyHeight(valueProperty);
 		var valuePosition = linePosition;
 		valuePosition.height = valuePropertyHeight;
+		// Give the value its own column instead of the full line. Since Unity 2020.1 a
+		// list value draws as a ReorderableList whose header paints an opaque background
+		// across the whole rect, hiding the key field drawn above; the overlapping key
+		// text field also swallowed the clicks meant for the value's foldout arrow
+		// (azixMcAze/Unity-SerializableDictionary#26).
+		valuePosition.xMin += labelWidth;
 		EditorGUI.PropertyField(valuePosition, valueProperty, GUIContent.none, true);
 
 		EditorGUIUtility.labelWidth = labelWidth;

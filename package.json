@@ -3,5 +3,5 @@
     "description": "Serializable dictionary class for Unity",
     "displayName": "Unity Serializable Dictionary",
     "name": "com.azixmcaze.unityserializabledictionary",
-    "version": "1.2.0"
+    "version": "1.2.1"
 }
