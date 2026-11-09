@@ -20,6 +20,13 @@ public abstract class SerializableDictionaryBase
 public abstract class SerializableDictionaryBase<TKey, TValue, TValueStorage> : SerializableDictionaryBase, IDictionary<TKey, TValue>, IDictionary, ISerializationCallbackReceiver, IDeserializationCallback, ISerializable
 {
 	Dictionary<TKey, TValue> m_dict;
+	// True when m_dict has changed since m_keys/m_values were last built from it.
+	// While false, the serialized arrays are authoritative: Unity's prefab save
+	// remaps object references by rewriting the serialized arrays in place, and
+	// rebuilding them from m_dict would throw those remapped references away
+	// (they were saved as {fileID: 0}).
+	[NonSerialized]
+	bool m_dirty = true;
 	[SerializeField]
 	TKey[] m_keys;
 	[SerializeField]
@@ -40,6 +47,7 @@ public abstract class SerializableDictionaryBase<TKey, TValue, TValueStorage> : 
 
 	public void CopyFrom(IDictionary<TKey, TValue> dict)
 	{
+		m_dirty = true;
 		m_dict.Clear();
 		foreach (var kvp in dict)
 		{
@@ -58,13 +66,24 @@ public abstract class SerializableDictionaryBase<TKey, TValue, TValueStorage> : 
 				m_dict[m_keys[i]] = GetValue(m_values, i);
 			}
 
-			m_keys = null;
-			m_values = null;
+			// Keep m_keys/m_values: they stay in sync with m_dict until it is modified.
+			m_dirty = false;
+		}
+		else
+		{
+			m_dirty = true;
 		}
 	}
 
 	public void OnBeforeSerialize()
 	{
+		if (!m_dirty && m_keys != null && m_values != null
+			&& m_keys.Length == m_values.Length && m_keys.Length == m_dict.Count)
+		{
+			// The arrays already match m_dict (values share the same instances).
+			return;
+		}
+
 		int n = m_dict.Count;
 		m_keys = new TKey[n];
 		m_values = new TValueStorage[n];
@@ -76,6 +95,7 @@ public abstract class SerializableDictionaryBase<TKey, TValue, TValueStorage> : 
 			SetValue(m_values, i, kvp.Value);
 			++i;
 		}
+		m_dirty = false;
 	}
 
 	#region IDictionary<TKey, TValue>
@@ -88,11 +108,12 @@ public abstract class SerializableDictionaryBase<TKey, TValue, TValueStorage> : 
 	public TValue this[TKey key]
 	{
 		get { return ((IDictionary<TKey, TValue>)m_dict)[key]; }
-		set { ((IDictionary<TKey, TValue>)m_dict)[key] = value; }
+		set { m_dirty = true; ((IDictionary<TKey, TValue>)m_dict)[key] = value; }
 	}
 
 	public void Add(TKey key, TValue value)
 	{
+		m_dirty = true;
 		((IDictionary<TKey, TValue>)m_dict).Add(key, value);
 	}
 
@@ -103,6 +124,7 @@ public abstract class SerializableDictionaryBase<TKey, TValue, TValueStorage> : 
 
 	public bool Remove(TKey key)
 	{
+		m_dirty = true;
 		return ((IDictionary<TKey, TValue>)m_dict).Remove(key);
 	}
 
@@ -113,11 +135,13 @@ public abstract class SerializableDictionaryBase<TKey, TValue, TValueStorage> : 
 
 	public void Add(KeyValuePair<TKey, TValue> item)
 	{
+		m_dirty = true;
 		((IDictionary<TKey, TValue>)m_dict).Add(item);
 	}
 
 	public void Clear()
 	{
+		m_dirty = true;
 		((IDictionary<TKey, TValue>)m_dict).Clear();
 	}
 
@@ -133,6 +157,7 @@ public abstract class SerializableDictionaryBase<TKey, TValue, TValueStorage> : 
 
 	public bool Remove(KeyValuePair<TKey, TValue> item)
 	{
+		m_dirty = true;
 		return ((IDictionary<TKey, TValue>)m_dict).Remove(item);
 	}
 
@@ -159,11 +184,12 @@ public abstract class SerializableDictionaryBase<TKey, TValue, TValueStorage> : 
 	public object this[object key]
 	{
 		get { return ((IDictionary)m_dict)[key]; }
-		set { ((IDictionary)m_dict)[key] = value; }
+		set { m_dirty = true; ((IDictionary)m_dict)[key] = value; }
 	}
 
 	public void Add(object key, object value)
 	{
+		m_dirty = true;
 		((IDictionary)m_dict).Add(key, value);
 	}
 
@@ -179,6 +205,7 @@ public abstract class SerializableDictionaryBase<TKey, TValue, TValueStorage> : 
 
 	public void Remove(object key)
 	{
+		m_dirty = true;
 		((IDictionary)m_dict).Remove(key);
 	}
 
